@@ -1,5 +1,5 @@
-target/*
-!target/wheels/*.whl
+target/
+#target/debug
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
