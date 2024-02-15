@@ -71,12 +71,15 @@ impl OLS{
     }
 
     fn __repr__(&self) -> String {
-        format!(
-            "SUMMARY OF OLS\n
-            Sample Size: {}\n
-            Parameter Size: {}\n
-            R² (predicted): {}",
-            self.size_samples, self.size_params, self.r2_predicted) //self.rss, self.r2,)
+        let _hline: String = "=".repeat(64);
+        let mut _lines: Vec<String> = vec![format!("|{: ^62}|", "SUMMARY OF OLS")];
+        _lines.push(_hline.clone());
+        _lines.push(format!("|{0: <20}{1: >10}||{2: <20}{3: >10.4}|",
+        "Sample Size", self.size_samples, "R² (predicted)", self.r2_predicted));
+        _lines.push(format!("|{0: <20}{1: >10}||{2: <20}{3: >10.4}|",
+        "Parameter Size", self.size_params, "R² (predicted)", self.r2_predicted));
+        _lines.push(_hline.clone());
+        _lines.join("\n")
     }
 
     fn __str__(&self) -> String {
