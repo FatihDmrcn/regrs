@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 # os.environ["RUST_BACKTRACE"] = "1"
  
 exog = 0.3*np.arange(0,100,1) + 0.6
-endog = exog + np.random.normal(0, 2, len(exog))
+endog = exog + np.random.normal(0, 4, len(exog))
 
 # plt.scatter(exog, endog)
 # plt.show()

@@ -9,6 +9,11 @@ fn _least_squares(exog: &mut Array2<f64>, endog: &Array1<f64>) -> LeastSquaresRe
     exog.least_squares(endog).unwrap()
 }
 
+fn _tss(endog: &Array1<f64>) -> f64 {
+    let _mean = endog.mean().unwrap();
+    endog.map(|f| (f-_mean).powf(2.0)).sum()
+}
+
 fn _rss(exog: &mut Array2<f64>, endog: &Array1<f64>, beta: &Array1<f64>) -> f64 {
     (endog - exog.dot(beta)).into_iter().map(|f| f.powf(2.0)).sum()
 }
@@ -31,8 +36,14 @@ fn _press(exog: &Array2<f64>, endog: &Array1<f64>, n: &usize) -> f64 {
     Array1::from_vec(errors).sum()
 }
 
-fn _r2(rss: &f64, var: &f64, n: &usize) -> f64{
-    1. - (rss/(var * *n as f64))
+fn _r2(tss: &f64, rss: &f64) -> f64{
+    1. - (rss/tss)
+}
+
+fn _r2_adjusted(tss: &f64, rss: &f64, n: &usize, p: &usize) -> f64{
+    let df_res = *n-*p;
+    let df_tot = *n-1;
+    1. - ((rss/df_res as f64)/(tss/df_tot as f64))
 }
 
 fn _r2_predicted(press: &f64, var: &f64, n: &usize) -> f64 {
@@ -43,14 +54,14 @@ fn _r2_predicted(press: &f64, var: &f64, n: &usize) -> f64 {
 struct OLS{
     size_samples: usize,
     size_params: usize,
+    tss: f64,
     rss: f64,
     press: f64,
     r2: f64,
-    // r2_adjusted: f64,
+    r2_adjusted: f64,
     r2_predicted: f64,
     var_endog: f64
 }
-
 
 #[pymethods]
 impl OLS{
@@ -70,38 +81,43 @@ impl OLS{
         let _least_squares_res = _least_squares(&mut _exog, &_endog);
         let _beta = _least_squares_res.solution;
         // STATS
+        let _tss: f64 = _tss(&_endog);
         let _rss: f64 = _rss(&mut _exog, &_endog, &_beta);
         let _press: f64 = _press(&_exog, &_endog, &_n);
         let _var: f64 = _endog.var(0.);
+        let _r2: f64 = _r2(&_tss, &_rss);
+        let _r2_adjusted: f64 = _r2_adjusted(&_tss, &_rss, &_n, &_p);
         let _r2_predicted: f64 = _r2_predicted(&_press, &_var, &_n);
-        let _r2: f64 = _r2(&_rss, &_var, &_n);
         // STRUCT
         Self{
             size_samples: _n,
             size_params: _p,
+            tss: _tss,
             rss: _rss,
             press: _press,
             r2: _r2,
+            r2_adjusted: _r2_adjusted,
             r2_predicted: _r2_predicted,
             var_endog: _var
         }
     }
 
     fn __repr__(&self) -> String {
-        let _hline: String = "=".repeat(84);
-        let mut _lines: Vec<String> = vec![format!("|{: ^82}|", "SUMMARY OF OLS")];
-        _lines.push(_hline.clone());
-        _lines.push(format!("|{0: <20}{1: >20}||{2: <20}{3: >20.4}|",
-        "Sample Size", self.size_samples, "RSS", self.rss));
-        _lines.push(format!("|{0: <20}{1: >20}||{2: <20}{3: >20.4}|",
-        "Parameter Size", self.size_params, "PRESS", self.press));
-        _lines.push(format!("|{0: <20}{1: >20.4}||{2: <20}{3: >20.4}|",
-        "Variance (Endog)", self.var_endog, "R²", self.r2));
-        _lines.push(format!("|{0: <20}{1: >20.4}||{2: <20}{3: >20.4}|",
-        "Variance (Endog)", self.var_endog, "R² (adjusted)", self.r2_predicted));
-        _lines.push(format!("|{0: <20}{1: >20.4}||{2: <20}{3: >20.4}|",
-        "Variance (Endog)", self.var_endog, "R² (predicted)", self.r2_predicted));
-        _lines.push(_hline.clone());
+        let _hline_dstroke: String = "=".repeat(84);
+        let _hline_stroke: String = "-".repeat(84);
+        let mut _lines: Vec<String> = vec![format!("|{: ^82}|", "RegRS SUMMARY")];
+        _lines.push(_hline_dstroke.clone());
+        _lines.push(format!("|{0: <20}{1: >20}||{2: <20}{3: >20}|",
+        "Sample Size",self.size_samples,"Parameter Size",self.size_params));
+        _lines.push(_hline_stroke.clone());
+        let _elements = vec![
+            ("TSS",self.tss,"R²",self.r2),
+            ("RSS",self.rss,"R² (adjusted)",self.r2_adjusted),
+            ("PRESS",self.press,"R² (predicted)",self.r2_predicted),];
+        for (_l_label, _l_value, _r_label, _r_value) in _elements {
+            _lines.push(format!("|{0: <20}{1: >20.4}||{2: <20}{3: >20.4}|",_l_label, _l_value, _r_label, _r_value));
+        }
+        _lines.push(_hline_dstroke.clone());
         _lines.join("\n")
     }
 
@@ -116,13 +132,22 @@ impl OLS{
     fn size_params(&self) -> PyResult<usize> {Ok(self.size_params)}
 
     #[getter]
-    fn r2_predicted(&self) -> PyResult<f64> {Ok(self.r2_predicted)}
+    fn tss(&self) -> PyResult<f64> {Ok(self.tss)}
+
+    #[getter]
+    fn rss(&self) -> PyResult<f64> {Ok(self.rss)}
+
+    #[getter]
+    fn press(&self) -> PyResult<f64> {Ok(self.press)}
 
     #[getter]
     fn r2(&self) -> PyResult<f64> {Ok(self.r2)}
 
     #[getter]
-    fn rss(&self) -> PyResult<f64> {Ok(self.rss)}
+    fn r2_adjusted(&self) -> PyResult<f64> {Ok(self.r2_adjusted)}
+
+    #[getter]
+    fn r2_predicted(&self) -> PyResult<f64> {Ok(self.r2_predicted)}
 
     #[getter]
     fn var(&self) -> PyResult<f64> {Ok(self.var_endog)}
