@@ -12,3 +12,5 @@ endog = exog + np.random.normal(0, 4, len(exog))
 ols = regrs.OLS(exog.reshape(-1,1), endog, add_const=True)
 print(ols)
 ```
+
+<img src="https://raw.github.com/FatihDmrcn/regrs/main/misc/img.png" alt="r2_predicted" width="550"/>
